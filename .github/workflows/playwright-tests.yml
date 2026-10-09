@@ -1,0 +1,114 @@
+name: Playwright Automation Tests (Final Project)
+
+on:
+  push:
+    branches: [develop, "feature/**"]
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Folder/file under tests/ (vd: tests/test_ticket_list.py). Trống = chạy toàn bộ"
+        required: false
+        type: string
+        default: "tests"
+      keyword:
+        description: "pytest -k filter (vd: pagination or iframe). Trống = không lọc"
+        required: false
+        type: string
+        default: ""
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  CI: "true"
+  HEADED: "false"
+  APP_URL: ${{ vars.APP_URL || 'https://bsv-nhungnguyen.github.io/bai_tap_17082026.html' }}
+  ADMIN_ID: ${{ secrets.ADMIN_ID }}
+  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+  GUEST_ID: ${{ secrets.GUEST_ID }}
+  GUEST_PASSWORD: ${{ secrets.GUEST_PASSWORD }}
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Run pytest
+        id: run_tests
+        run: |
+          set +e
+          TARGET="${{ inputs.target || 'tests' }}"
+          KEYWORD="${{ inputs.keyword }}"
+          if [ -n "$KEYWORD" ]; then
+            python -m pytest "$TARGET" --clean-alluredir -k "$KEYWORD"
+          else
+            python -m pytest "$TARGET" --clean-alluredir
+          fi
+          echo "pytest_exit=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Write Allure metadata
+        if: always()
+        run: |
+          mkdir -p allure-results
+          {
+            echo "Browser=Chromium"
+            echo "Base_URL=${APP_URL}"
+            echo "Tester=${{ github.actor }}"
+            echo "Branch=${{ github.ref_name }}"
+          } > allure-results/environment.properties
+          cat <<'EOF' > allure-results/categories.json
+          [
+            {"name": "Timeout Errors",     "matchedStatuses": ["failed", "broken"], "messageRegex": ".*TimeoutError.*"},
+            {"name": "Assertion Failures", "matchedStatuses": ["failed"], "messageRegex": ".*AssertionError.*"},
+            {"name": "Playwright Errors",  "matchedStatuses": ["failed", "broken"], "messageRegex": ".*playwright.*"}
+          ]
+          EOF
+
+      - name: Generate Allure report
+        if: always()
+        run: |
+          npm install -g allure-commandline
+          allure generate allure-results -o allure-report --clean
+
+      - name: Upload allure-report artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 30
+
+      # Publish report lên GitHub Pages (nhánh gh-pages) — chỉ khi push vào develop hoặc chạy tay
+      - name: Deploy report to gh-pages
+        if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name == 'develop'))
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: allure-report
+          destination_dir: ${{ github.run_number }}
+          keep_files: true
+
+      - name: Fail job if tests failed
+        if: always()
+        run: |
+          EXIT_CODE="${{ steps.run_tests.outputs.pytest_exit }}"
+          echo "pytest exit code: ${EXIT_CODE}"
+          [ "${EXIT_CODE}" = "0" ] || exit 1
