@@ -215,6 +215,7 @@ def access_to_ticket_list_screen(
     return TicketListPage(access_to_login_screen.page)
 
 
+###NNTT: Fixture đang không có chỗ sử dụng, cân nhắc comment nếu không cần thiết. 
 @pytest.fixture
 def access_to_ticket_list_screen_as_guest(
     access_to_login_screen: LoginPage, guest_credentials: tuple[str, str]

@@ -3,7 +3,7 @@ import allure
 from constants.messages import SIGNATURE_COUNTER_TEMPLATE
 from helpers import description_md
 from pages.settings_page import SettingsPage
-from testdata.test_data import SIGNATURE_MAX_LENGTH, SIGNATURE_OVER_LENGTH
+from testdata.test_data import SIGNATURE_MAX_LENGTH
 
 
 @allure.feature("設定画面")
@@ -22,8 +22,11 @@ class Test設定画面:
     def test_signature_over_max_length_is_truncated_and_counter_stops(
         self, access_to_settings_screen: SettingsPage
     ):
-        over_length_text = access_to_settings_screen.random_chars(SIGNATURE_OVER_LENGTH)
+        #over_length_text = access_to_settings_screen.random_chars(SIGNATURE_OVER_LENGTH)
+        ###NNTT: nếu được nên tách hàm random_chars ra hàm riêng để test, mục đích để ở report allure sẽ hiển thị được là mình đã nhập bao nhiêu text ở đó. 
+        ###Ngoài ra sẽ tốt hơn nếu viết hàm random vượt quá số lượng SIGNATURE_MAX_LENGTH thay vì phải tạo thêm 1 biến quy định SIGNATURE_MAX_LENGTH 
 
+        over_length_text = access_to_settings_screen.random_text_over_max(SIGNATURE_MAX_LENGTH)
         access_to_settings_screen.type_signature(over_length_text)
 
         access_to_settings_screen.expect_signature_truncated(over_length_text, SIGNATURE_MAX_LENGTH)

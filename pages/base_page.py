@@ -95,6 +95,15 @@ class BasePage:
         pool = "自動化テストあいうえおかきくけこ" + "Kiểm thử tự động" + string.ascii_letters + string.digits
         return "".join(random.choice(pool) for _ in range(length))
 
+    @staticmethod
+    def random_text_over_max(max_length: int) -> str:
+        """Chuỗi dài hơn max_length. Số ký tự dư tính từ max_length, không cần hằng số riêng."""
+        over_by = max(1, max_length // 5)
+        text = BasePage.random_chars(max_length + over_by)
+        with allure.step(f"Random input: {len(text)} chars (max {max_length}, over by {over_by})"):
+            allure.attach(text, name="random_input", attachment_type=allure.attachment_type.TEXT)
+        return text
+
     def elements_outside_viewport(self, named_locators: dict[str, Locator]) -> list[str]:
         """Tra ve ten cac phan tu bi tran ra ngoai chieu ngang viewport."""
         viewport_width = self.page.viewport_size["width"]
